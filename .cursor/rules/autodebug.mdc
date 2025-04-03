@@ -1,0 +1,118 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+ ---
+description: Instructions for automated debugging of SystemVerilog modules with cocotb
+globs: 
+alwaysApply: true
+---
+When prompted to debug a module, follow these steps in order:
+
+1. Initial Setup and Analysis:
+   - Verify the module directory structure is correct
+   - Check for presence of all required files:
+     - [modulename].sv
+     - test_[modulename].py
+     - Makefile
+     - README.md
+   - Review the test plan in [modulename]_tests.txt if available
+
+2. First Run and Log Analysis:
+   - Run `make clean && make` to get a fresh build
+   - Examine sim.log for:
+     - Compilation errors
+     - Test failures
+     - Parameter mismatches
+     - Timing violations
+   - Document all failures and their locations
+
+3. Testbench-First Debugging (Priority):
+   a) Parameter Verification:
+      - Check if testbench parameters match DUT parameters
+      - Verify parameter passing in Makefile
+      - Ensure PLUSARGS/COMPILE_ARGS are correctly set
+      - Test with both default and non-default parameters
+
+   b) Reset Sequence Analysis:
+      - Verify reset timing in testbench
+      - Check reset assertion/deassertion timing
+      - Ensure proper clock cycles between reset operations
+      - Verify reset value propagation
+
+   c) Signal Timing Verification:
+      - Check clock setup and timing
+      - Verify signal propagation delays
+      - Ensure proper edge alignment
+      - Check for race conditions
+
+   d) Test Structure Review:
+      - Verify test independence
+      - Check for proper test sequencing
+      - Ensure adequate test coverage
+      - Verify edge case handling
+
+4. DUT Debugging (Only after testbench is verified):
+   a) Reset Behavior:
+      - Verify asynchronous reset implementation
+      - Check reset value assignments
+      - Ensure proper reset state transitions
+
+   b) Signal Handling:
+      - Verify input/output connections
+      - Check signal widths and types
+      - Ensure proper clock domain handling
+      - Verify combinational logic
+
+   c) State Machine Analysis:
+      - Check state transitions
+      - Verify state encoding
+      - Ensure proper state initialization
+      - Check for unreachable states
+
+5. Iterative Testing Process:
+   a) Make one change at a time
+   b) Run tests after each change
+   c) Document changes and results
+   d) Revert changes that don't improve the situation
+
+6. Common Issues to Check:
+   - Parameter mismatches between testbench and DUT
+   - Reset timing and behavior
+   - Clock domain crossing issues
+   - Signal width mismatches
+   - Race conditions
+   - Uninitialized signals
+   - Incorrect edge sensitivity
+
+7. Debugging Guidelines:
+   - Always start with testbench verification
+   - Make minimal changes to fix issues
+   - Document all changes and their rationale
+   - Verify fixes don't introduce new issues
+   - Use systematic approach to isolate problems
+   - Consider both functional and timing issues
+
+8. Success Criteria:
+   - All tests pass
+   - No compilation warnings
+   - No timing violations
+   - Proper parameter handling
+   - Correct reset behavior
+   - Expected signal timing
+   - Clean simulation log
+
+9. Documentation:
+   - Update README.md with any behavioral changes
+   - Document any parameter changes
+   - Update test descriptions if needed
+   - Note any timing requirements
+   - Document reset behavior
+
+10. Final Verification:
+    - Run full test suite
+    - Check simulation log
+    - Verify parameter handling
+    - Confirm reset behavior
+    - Validate timing requirements

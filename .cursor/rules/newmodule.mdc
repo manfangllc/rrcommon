@@ -1,12 +1,33 @@
 ---
 description: 
 globs: 
+alwaysApply: false
+---
+---
+description: 
+globs: 
 alwaysApply: true
 ---
 When prompted to generate a new module, do the following:
 
-Based on the module name, create a:
+Determine if it's reasonable to make the module based on the parameters passed in and the available documentation/context.
 
-new directory in the root named [modulename]
+Determine if the cocotb docs are in the context.
 
-Go into that directory, and generate a [modulename.sv] file with the code, a [modulename_tb.sv] file with the testbench, and a README.md with a descriptin of the module, including the following (and only the following) sections: ports, parameters, an instantiation snippet, module usage description, and an example with timing diagrams. Do not include any other topics.
+If it cannot be created with a reasonable degree of accuracy, or if the cocotb docs are not in context, inform the user of the issue (ie, not enough details, cocotb docs are not in context, and they should add them), and do not follow the rest of the instructions. Abort the request.
+
+If the module can be created, then based on the module name,
+
+1. Create a: new directory in the root named [modulename]
+
+2. Go into that directory 
+
+3. generate a [modulename.sv] file with the code, based on the input description and following the rules in newmodule.mdc.
+
+4. Examine the module for functionality, and create a [modulename]_tests.txt document with a series of tests to confirm critical functionality of the module and test reasonable edge cases.
+
+5. Using the [modulename]_tests.txt file, Generate a cocotb test_[modulename.py] file with the testbench following these patterns:
+
+6. Create but leave empty a file named test_[modulename].py to later build into a testbench.
+
+7. Create a README.md with a description of the module, including the following (and only the following) sections: ports, parameters, an instantiation snippet, module usage description, and an example with timing diagrams. Do not include any other topics.

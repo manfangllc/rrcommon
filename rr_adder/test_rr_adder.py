@@ -1,5 +1,5 @@
 import cocotb
-from cocotb.triggers import Timer
+from cocotb.triggers import Timer, RisingEdge
 import traceback
 
 def log_test_progress(dut, message):
@@ -31,19 +31,25 @@ def format_error_message(test_num, a, b, cin, expected_sum, actual_sum, is_sum=T
 async def rr_adder_test(dut):
     """Test the rr_adder module with all possible input combinations."""
     try:
+        # Initialize signals
+        dut.a_i.value = 0
+        dut.b_i.value = 0
+        dut.cin_i.value = 0
+        await Timer(50, units="ns")  # Longer initial wait for better visibility
+        
         log_test_progress(dut, "Starting single-bit adder test suite")
         
         # Test all possible combinations for single-bit adder
         test_cases = [
             # a_i, b_i, cin_i, expected_sum, expected_cout
-            (0, 0, 0, 0, 0),
-            (0, 0, 1, 1, 0),
-            (0, 1, 0, 1, 0),
-            (0, 1, 1, 0, 1),
-            (1, 0, 0, 1, 0),
-            (1, 0, 1, 0, 1),
-            (1, 1, 0, 0, 1),
-            (1, 1, 1, 1, 1)
+            (0, 0, 0, 0, 0),  # Test case 1: 0 + 0 + 0 = 0
+            (0, 0, 1, 1, 0),  # Test case 2: 0 + 0 + 1 = 1
+            (0, 1, 0, 1, 0),  # Test case 3: 0 + 1 + 0 = 1
+            (0, 1, 1, 0, 1),  # Test case 4: 0 + 1 + 1 = 2 (carry)
+            (1, 0, 0, 1, 0),  # Test case 5: 1 + 0 + 0 = 1
+            (1, 0, 1, 0, 1),  # Test case 6: 1 + 0 + 1 = 2 (carry)
+            (1, 1, 0, 0, 1),  # Test case 7: 1 + 1 + 0 = 2 (carry)
+            (1, 1, 1, 1, 1)   # Test case 8: 1 + 1 + 1 = 3 (carry)
         ]
 
         # Test each case
@@ -56,8 +62,8 @@ async def rr_adder_test(dut):
                 dut.b_i.value = b
                 dut.cin_i.value = cin
                 
-                # Wait for a small delay to allow combinational logic to settle
-                await Timer(1, units="ns")
+                # Wait for a longer delay to allow combinational logic to settle
+                await Timer(50, units="ns")
                 
                 # Log the data transfer
                 log_data_transfer(dut, a, b, cin, dut.sum_o.value, dut.cout_o.value)
@@ -74,6 +80,9 @@ async def rr_adder_test(dut):
                     raise AssertionError(error_msg)
                 
                 log_test_progress(dut, f"Test case {test_num} passed successfully")
+                
+                # Add a small delay between test cases for better waveform visibility
+                await Timer(50, units="ns")
                 
             except Exception as e:
                 dut._log.error(f"Test case {test_num} failed with error: {str(e)}")

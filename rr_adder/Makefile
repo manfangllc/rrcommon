@@ -13,6 +13,9 @@ TOPLEVEL = rr_adder
 # Test module
 MODULE = test_rr_adder
 
+# Enable waveform dumping
+WAVES ?= 1
+
 # Simulator output file
 SIM_ARGS += > sim.log 2>&1
 
