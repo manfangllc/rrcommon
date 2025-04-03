@@ -24,7 +24,7 @@ If the module can be created, then based on the module name,
 
 3. generate a [modulename.sv] file with the code, based on the input description and following the rules in newmodule.mdc.
 
-4. Examine the module for functionality, and create a [modulename]_tests.txt document with a series of tests to confirm critical functionality of the module and test reasonable edge cases.
+4. Examine the module for functionality, and create a [modulename]_tests.txt document with a series of tests to confirm critical functionality of the module and test reasonable edge cases. Consider what tests are important for functionality, and do not overtest or duplicate tests.
 
 5. Using the [modulename]_tests.txt file, Generate a cocotb test_[modulename.py] file with the testbench following these patterns:
 

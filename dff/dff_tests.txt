@@ -1,0 +1,26 @@
+ D Flip-Flop Test Plan
+
+1. Basic Functionality Tests
+   - Test 1: Reset functionality
+     * Assert reset, verify output is 0
+     * Deassert reset, verify output follows input
+   
+   - Test 2: Data capture
+     * Apply various input patterns
+     * Verify output matches input on next clock edge
+     * Test with different DATA_WIDTH values
+
+2. Edge Cases
+   - Test 3: Clock edge sensitivity
+     * Verify output only changes on positive clock edge
+     * Test with input changes between clock edges
+   
+   - Test 4: Reset timing
+     * Test reset assertion during normal operation
+     * Test reset deassertion timing
+
+3. Parameter Tests
+   - Test 5: Different DATA_WIDTH values
+     * Test with DATA_WIDTH = 1
+     * Test with DATA_WIDTH = 8
+     * Test with DATA_WIDTH = 32

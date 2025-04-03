@@ -1,0 +1,320 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## 🧠 SystemVerilog Testbench Rules (Cocotb Focus)
+
+a) Imports and Setup:
+      - Import required cocotb modules:
+        ```python
+        import cocotb
+        from cocotb.clock import Clock
+        from cocotb.triggers import Timer, RisingEdge, FallingEdge
+        from cocotb.log import SimLog
+        import random
+        import traceback
+        ```
+      - Define test parameters at the top:
+        ```python
+        # Test parameters
+        CLK_PERIOD = 10  # 10ns = 100MHz
+        INIT_DELAY = 50  # Initial delay to allow signals to settle
+        RESET_DELAY = 50  # Reset hold time
+        SETUP_TIME = 2   # Setup time before clock edge
+        HOLD_TIME = 2    # Hold time after clock edge
+        ```
+      - Set up module-level logger:
+        ```python
+        log = SimLog("<module_name>_test")
+        ```
+
+   b) Helper Functions:
+      - Create helper functions for common operations
+      - Each helper should include:
+        - Try-except block with error logging
+        - Debug level logging for detailed operations
+        - Clear error messages with stack traces
+        - Return values or status as needed
+      - Include waveform marker helpers:
+        ```python
+        async def add_wave_marker(dut, name):
+            """Add a marker to the waveform for debugging."""
+            log.debug(f"Adding waveform marker: {name}")
+            await Timer(1, units="ns")  # Small delay for visibility
+        ```
+      - Include reset helper function:
+        ```python
+        async def reset_dut(dut):
+            """Helper function to reset the DUT."""
+            try:
+                log.info("Starting reset sequence")
+                await add_wave_marker(dut, "Reset Start")
+                dut.rst_n.value = 0
+                await Timer(RESET_DELAY, units="ns")
+                await add_wave_marker(dut, "Reset End")
+                dut.rst_n.value = 1
+                await Timer(CLK_PERIOD, units="ns")
+                log.info("Reset sequence completed")
+            except Exception as e:
+                error_msg = f"Reset sequence failed: {str(e)}\n{traceback.format_exc()}"
+                log.error(error_msg)
+                raise
+        ```
+
+   c) Test Functions:
+      - Each test should be decorated with @cocotb.test()
+      - Use async/await for timing control
+      - Follow this structure:
+        ```python
+        @cocotb.test()
+        async def test_<module_name>_<test_case>(dut):
+            """Test description."""
+            try:
+                log.info("Starting test")
+                
+                # Initial delay for signal settling
+                await Timer(INIT_DELAY, units="ns")
+                
+                # Clock setup
+                clock = Clock(dut.clk, CLK_PERIOD, units="ns")
+                cocotb.start_soon(clock.start(start_high=False))
+                
+                # Reset sequence
+                await reset_dut(dut)
+                
+                # Test specific operations
+                # Use log.debug() for detailed operations
+                # Use log.info() for major state changes
+                # Add waveform markers for key events
+                
+                log.info("Test passed")
+            except Exception as e:
+                error_msg = f"Test failed: {str(e)}\n{traceback.format_exc()}"
+                log.error(error_msg)
+                raise
+        ```
+
+   d) Signal Value Handling:
+      - IMPORTANT: Always check signal width before assignment
+      - For parameterized modules, verify DATA_WIDTH before generating test values
+      - Use bit masking for multi-bit signals: value & ((1 << width) - 1)
+      - Handle undefined/high-impedance states (z, x) in assertions
+      - For reset verification, check both undefined and zero states
+      - Example signal handling:
+        ```python
+        # Get signal width
+        width = len(dut.data_i)
+        # Generate valid test value
+        test_value = random.randint(0, (1 << width) - 1)
+        # Apply value with width check
+        dut.data_i.value = test_value & ((1 << width) - 1)
+        ```
+
+   e) Test Coverage:
+      - Include reset state verification with undefined state handling
+      - Test basic functionality
+      - Test edge cases and error conditions
+      - Test multiple operations in sequence
+      - Use random values within valid signal width ranges
+      - Verify all outputs and state changes
+      - Test timing requirements (setup/hold)
+      - Verify parameter propagation
+      - Test reset during active operation
+
+   f) Error Handling:
+      - Wrap all test functions in try-except blocks
+      - Include full stack traces in error messages
+      - Log all relevant signal values on failure
+      - Use clear, descriptive error messages
+      - Raise exceptions to fail tests
+      - Include timing information in error messages
+      - Log signal values before and after failures
+      - Handle simulator-specific value representations (z, x)
+
+   g) Timing Control:
+      - Use Timer for fixed delays
+      - Use RisingEdge/FallingEdge for clock-synchronized operations
+      - Wait appropriate times for reset and state changes
+      - Consider clock period in timing calculations
+      - Add small delays (1ns) after clock edges for signal propagation
+      - Use half-clock period delays for mid-cycle changes
+      - Document timing requirements in test comments
+      - Consider clock-to-Q delays in assertions
+
+   h) Test Organization:
+      - Group related tests together
+      - Use clear, descriptive test names
+      - Include docstrings explaining test purpose
+      - Order tests from basic to complex
+      - Reuse helper functions for common operations
+      - Structure tests in increasing complexity:
+        - Basic functionality (reset, clock)
+        - Data capture
+        - Hold behavior
+        - Edge cases (reset during operation)
+      - Each test should be independent and self-contained
+      - Document test dependencies if any exist
+
+   i) Parameter Handling:
+      - Always ensure testbench parameters match DUT parameters
+      - Define test parameters at the top of the file
+      - Document the relationship between testbench and DUT parameters
+      - Verify parameter passing in Makefile
+      - For parameterized modules, test with both default and non-default parameter values
+      - Log parameter values at test start
+      - Handle parameter-dependent signal widths correctly
+
+   j) Reset Testing:
+      - Verify reset assertion (immediate effect)
+      - Handle undefined states during reset
+      - Test reset hold behavior
+      - Verify reset deassertion timing relative to clock
+      - Test reset value propagation
+      - Include reset during active operation tests
+      - Document expected reset timing in test comments
+      - Add waveform markers for reset events
+
+   k) Signal Timing:
+      - Include small delays after clock edges for signal propagation
+      - Use half-clock period delays for mid-cycle changes
+      - Test multiple clock cycles for setup/hold verification
+      - Document timing requirements in test comments
+      - Consider clock-to-Q delays in assertions
+      - Add waveform markers for timing verification
+      - Log timing information for critical operations
+
+   l) Makefile Configuration:
+      - Basic structure:
+        ```makefile
+        # Simulator selection
+        SIM ?= icarus
+        TOPLEVEL_LANG ?= verilog
+
+        # Source files
+        VERILOG_SOURCES = $(shell pwd)/<module>.sv
+
+        # Module configuration
+        TOPLEVEL = <module>
+        MODULE = test_<module>
+
+        # Simulator arguments for SystemVerilog
+        COMPILE_ARGS += -g2012  # Enable SystemVerilog support
+
+        # Waveform dumping configuration
+        WAVES=1
+        COMPILE_ARGS += -DWAVES=1
+
+        # Include cocotb makefiles
+        include $(shell cocotb-config --makefiles)/Makefile.sim
+        ```
+      - Key points:
+        - Use -g2012 for SystemVerilog support
+        - Keep waveform configuration simple
+        - Avoid complex VCD/FST arguments
+        - Use proper simulator flags
+        - Handle parameter passing correctly
+        - Redirect simulator output to log file
+        - Use proper file paths with $(shell pwd)
+
+   m) Common Issues and Solutions:
+      - Signal width mismatches:
+        - Always check signal width before assignment
+        - Use proper masking for multi-bit signals
+      - Reset verification:
+        - Handle undefined states (z, x)
+        - Check both reset assertion and deassertion
+      - Simulator compatibility:
+        - Use basic waveform dumping options
+        - Avoid complex simulator-specific flags
+      - Parameter handling:
+        - Verify parameter values at start of test
+        - Handle width-dependent operations correctly
+      - Timing issues:
+        - Add proper delays for signal settling
+        - Consider simulator resolution
+        - Use consistent timing throughout tests
+
+### 🔧 Makefile Configuration
+```makefile
+# Makefile for module testbench
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+# Source files
+VERILOG_SOURCES = $(shell pwd)/module.sv
+
+# Top level module
+TOPLEVEL = module_name
+
+# Test module
+MODULE = test_module
+
+# Enable waveform dumping
+# Note: For Icarus Verilog, waveform dumping is handled automatically by cocotb
+# Do not add VCD/FST options to SIM_ARGS as they can conflict with vvp
+WAVES=1
+
+# Redirect output to log file
+SIM_ARGS += > sim.log 2>&1
+
+# Python path for cocotb
+PYTHONPATH := $(shell pwd):$(PYTHONPATH)
+
+# Include cocotb makefiles
+include $(shell cocotb-config --makefiles)/Makefile.sim
+
+# Additional targets for clean-up
+.PHONY: clean_waves
+clean_waves:
+	rm -rf sim_build/*.vcd
+
+.PHONY: clean_all
+clean_all: clean clean_waves
+	rm -f sim.log
+```
+
+Important Notes:
+1. Do not add VCD/FST arguments to SIM_ARGS as they conflict with vvp
+2. Use WAVES=1 to enable waveform dumping (handled by cocotb)
+3. Include clean-up targets for better maintenance
+4. Add PYTHONPATH for module discovery
+
+### �� Test Verification
+```makefile
+# Makefile for module testbench
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+# Source files
+VERILOG_SOURCES = $(shell pwd)/module.sv
+
+# Top level module
+TOPLEVEL = module_name
+
+# Test module
+MODULE = test_module
+
+# Enable waveform dumping
+# Note: For Icarus Verilog, waveform dumping is handled automatically by cocotb
+# Do not add VCD/FST options to SIM_ARGS as they can conflict with vvp
+WAVES=1
+
+# Redirect output to log file
+SIM_ARGS += > sim.log 2>&1
+
+# Python path for cocotb
+PYTHONPATH := $(shell pwd):$(PYTHONPATH)
+
+# Include cocotb makefiles
+include $(shell cocotb-config --makefiles)/Makefile.sim
+
+# Additional targets for clean-up
+.PHONY: clean_waves
+clean_waves:
+	rm -rf sim_build/*.vcd
+
+.PHONY: clean_all
+clean_all: clean clean_waves
+	rm -f sim.log
+``` 
