@@ -3,11 +3,6 @@ description:
 globs: 
 alwaysApply: false
 ---
----
-description: 
-globs: 
-alwaysApply: true
----
 When prompted to generate a new module, do the following:
 
 Determine if it's reasonable to make the module based on the parameters passed in and the available documentation/context.

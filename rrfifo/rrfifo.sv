@@ -64,8 +64,14 @@ module rrfifo #(
     end
   end
 
-  // Read data output
-  assign rd_data_o = mem[rd_ptr];
+  // Read data output - registered
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      rd_data_o <= '0;
+    end else if (rd_valid) begin
+      rd_data_o <= mem[rd_ptr];
+    end
+  end
 
   // FIFO control logic
   always_ff @(posedge clk or negedge rst_n) begin

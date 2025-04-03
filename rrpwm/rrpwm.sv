@@ -24,52 +24,81 @@ module rrpwm #(
   output logic [NUM_CHANNELS-1:0]     pwm_o         // PWM output channels
 );
 
-  // Internal counter for PWM generation
+  // Internal signals
   logic [COUNTER_WIDTH-1:0] counter;
+  logic [COUNTER_WIDTH-1:0] period_value;
+  logic [COUNTER_WIDTH-1:0] next_counter;
+  logic reset_complete;
+  logic [NUM_CHANNELS-1:0] duty_set;  // Track if duty cycle has been explicitly set
   
   // Effective period value (use parameter if input is 0)
-  logic [COUNTER_WIDTH-1:0] period_value;
   assign period_value = (period_i == '0) ? DEFAULT_PERIOD : period_i;
   
-  // Counter logic
+  // Reset completion detection
+  always_ff @(posedge clk_i or negedge rst_n_i) begin
+    if (!rst_n_i) begin
+      reset_complete <= 1'b0;
+      duty_set <= '0;
+    end else begin
+      reset_complete <= 1'b1;
+      // Track when duty cycle is explicitly set to non-zero
+      for (int i = 0; i < NUM_CHANNELS; i++) begin
+        if (duty_i[i] != '0) begin
+          duty_set[i] <= 1'b1;
+        end
+      end
+    end
+  end
+  
+  // Calculate next counter value
+  always_comb begin
+    if (!reset_complete) begin
+      next_counter = '0;
+    end else if (counter >= period_value) begin
+      next_counter = '0;
+    end else begin
+      next_counter = counter + 1'b1;
+    end
+  end
+  
+  // Counter logic with proper reset behavior
   always_ff @(posedge clk_i or negedge rst_n_i) begin
     if (!rst_n_i) begin
       counter <= '0;
     end else begin
-      if (counter >= period_value) begin
-        // Reset counter at end of period
-        counter <= '0;
-      end else begin
-        // Increment counter
-        counter <= counter + 1'b1;
-      end
+      counter <= next_counter;
     end
   end
   
   // PWM output generation for each channel
   for (genvar i = 0; i < NUM_CHANNELS; i++) begin : gen_pwm_channels
-    // Effective duty cycle for this channel (use parameter if input is 0)
+    // Effective duty cycle for this channel
     logic [COUNTER_WIDTH-1:0] effective_duty;
+    logic pwm_active;
     
+    // Calculate effective duty cycle
     always_comb begin
-      // Use default duty if input is 0 or if duty > period
-      if (duty_i[i] == '0 || duty_i[i] > period_value) begin
+      if (!enable_i[i]) begin
+        effective_duty = '0;  // Force 0% when disabled
+      end else if (duty_i[i] == '0 && !duty_set[i]) begin
+        // Use default duty cycle until explicitly set
         effective_duty = (DEFAULT_DUTY > period_value) ? period_value : DEFAULT_DUTY;
       end else begin
-        effective_duty = duty_i[i];
+        // Use actual duty cycle value (0 means 0%)
+        effective_duty = (duty_i[i] > period_value) ? period_value : duty_i[i];
       end
     end
     
-    // Generate PWM output by comparing counter to duty cycle
+    // Calculate PWM output value
+    assign pwm_active = (counter < effective_duty);
+    
+    // Generate PWM output with synchronous reset
     always_ff @(posedge clk_i or negedge rst_n_i) begin
-      if (!rst_n_i) begin
-        pwm_o[i] <= POLARITY ? 1'b0 : 1'b1;  // Respect polarity on reset
-      end else if (!enable_i[i]) begin
-        pwm_o[i] <= POLARITY ? 1'b0 : 1'b1;  // Inactive state when disabled
+      if (!rst_n_i || !enable_i[i]) begin
+        pwm_o[i] <= POLARITY ? 1'b0 : 1'b1;  // Reset or disable to inactive state
       end else begin
-        // Active when counter < duty cycle (with polarity control)
-        pwm_o[i] <= (counter < effective_duty) ? 
-                    (POLARITY ? 1'b1 : 1'b0) : (POLARITY ? 1'b0 : 1'b1);
+        pwm_o[i] <= pwm_active ? (POLARITY ? 1'b1 : 1'b0) : 
+                                (POLARITY ? 1'b0 : 1'b1);
       end
     end
   end

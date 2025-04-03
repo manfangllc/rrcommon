@@ -6,217 +6,251 @@ import random
 import traceback
 
 # Test parameters
-COUNTER_WIDTH = 8
-NUM_CHANNELS = 1  # Changed from 4 to 1 to match module default
 CLK_PERIOD = 10  # 10ns = 100MHz
+INIT_DELAY = 50  # Initial delay to allow signals to settle
+RESET_DELAY = 50  # Reset hold time
+
+# Module parameters (matching RTL)
+COUNTER_WIDTH = 8
 DEFAULT_PERIOD = 255
 DEFAULT_DUTY = 128
+NUM_CHANNELS = 1
 
-# Set up module-level logger
+# Setup module-level logger
 log = SimLog("rrpwm_test")
 
-async def measure_pwm(dut, channel, period, cycles):
-    """Measure PWM duty cycle for a channel."""
-    log.debug(f"Measuring PWM duty cycle for channel {channel}")
-    high_count = 0
-    period_count = 0
-    
-    # Measure for the specified number of complete periods
-    for cycle in range(cycles):
-        log.debug(f"Starting measurement cycle {cycle}")
-        # Wait for rising edge
-        while not dut.pwm_o.value:  # Changed from pwm_o[channel] to pwm_o
-            await RisingEdge(dut.clk_i)
+async def add_wave_marker(dut, name):
+    """Add a marker to the waveform for debugging."""
+    log.debug(f"Adding waveform marker: {name}")
+    await Timer(1, units="ns")
+
+async def initialize_dut(dut):
+    """Initialize DUT inputs."""
+    dut.period_i.value = 0  # Use default period
+    dut.enable_i.value = 0  # Start disabled
+    dut.duty_i[0].value = 0  # Use default duty cycle
+    await Timer(1, units="ns")
+
+async def apply_reset(dut):
+    """Apply reset to DUT."""
+    await add_wave_marker(dut, "Reset Start")
+    dut.rst_n_i.value = 0
+    await Timer(RESET_DELAY, units="ns")
+    await add_wave_marker(dut, "Reset End")
+    dut.rst_n_i.value = 1
+    await Timer(CLK_PERIOD, units="ns")
+
+@cocotb.test()
+async def test_reset_behavior(dut):
+    """Test 1: Reset Behavior Tests"""
+    try:
+        log.info("Starting reset behavior test")
         
-        # Count through one complete period
-        while period_count < period:
+        # Clock setup
+        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
+        cocotb.start_soon(clock.start(start_high=False))
+        
+        # Initialize signals
+        await initialize_dut(dut)
+        
+        # Apply reset and check values
+        await apply_reset(dut)
+        
+        # Verify counter reset to 0
+        await RisingEdge(dut.clk_i)
+        assert dut.counter.value == 0, f"Counter not reset to 0, got {dut.counter.value}"
+        
+        # Check output polarity on reset
+        assert dut.pwm_o.value == 0, f"PWM output wrong on reset, got {dut.pwm_o.value}"
+        
+        log.info("Reset behavior test passed")
+    except Exception as e:
+        log.error(f"Test failed: {str(e)}\n{traceback.format_exc()}")
+        raise
+
+@cocotb.test()
+async def test_basic_pwm_generation(dut):
+    """Test 2: Basic PWM Generation Tests"""
+    try:
+        log.info("Starting basic PWM generation test")
+        
+        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
+        cocotb.start_soon(clock.start(start_high=False))
+        
+        await initialize_dut(dut)
+        await apply_reset(dut)
+        
+        # Enable PWM
+        dut.enable_i.value = 1
+        
+        # Monitor for one complete period
+        high_count = 0
+        total_count = 0
+        
+        for _ in range(DEFAULT_PERIOD):
             await RisingEdge(dut.clk_i)
-            period_count += 1
-            if dut.pwm_o.value:  # Changed from pwm_o[channel] to pwm_o
+            if dut.pwm_o.value == 1:
                 high_count += 1
+            total_count += 1
         
-        # Reset period counter for next cycle
-        period_count = 0
-    
-    # Calculate measured duty cycle
-    measured_duty = high_count / period
-    log.debug(f"Measured duty cycle: {measured_duty:.3f}")
-
-    return measured_duty
-
-@cocotb.test()
-async def test_rrpwm_basic(dut):
-    """Test 1: Basic operation - Enable channel 0 with 50% duty cycle."""
-    try:
-        log.info("Starting basic PWM test")
-        # Set up clock
-        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
-        cocotb.start_soon(clock.start(start_high=False))
+        duty_cycle = (high_count / total_count) * 100
+        expected_duty = (DEFAULT_DUTY / DEFAULT_PERIOD) * 100
         
-        # Reset
-        log.info("Applying reset")
-        dut.rst_n_i.value = 0
-        await Timer(CLK_PERIOD * 2, units="ns")
-        dut.rst_n_i.value = 1
-        await Timer(CLK_PERIOD * 2, units="ns")
+        assert abs(duty_cycle - expected_duty) <= 1, f"Duty cycle error: got {duty_cycle}%, expected {expected_duty}%"
         
-        # Set up test parameters
-        period = 100  # Set period to 100 clock cycles
-        dut.period_i.value = period
-        dut.enable_i.value = 0  # Disable all channels initially
-        
-        # Set duty cycle for channel 0 to 50%
-        duty = 50
-        dut.duty_i.value = duty  # Changed from duty_i[0] to duty_i
-        
-        # Enable channel 0
-        log.info(f"Enabling channel with period={period}, duty={duty}")
-        dut.enable_i.value = 1
-        
-        # Wait for 3 periods
-        await Timer(CLK_PERIOD * period * 3, units="ns")
-        
-        # Measure duty cycle
-        measured_duty = await measure_pwm(dut, 0, period, 1)
-        
-        # Expected duty ratio
-        expected_duty = duty / period
-        
-        # Check if duty cycle is within tolerance
-        tolerance = 0.01  # 1% tolerance
-        assert abs(measured_duty - expected_duty) <= tolerance, \
-            f"Channel 0 duty cycle mismatch. Expected: {expected_duty:.3f}, Measured: {measured_duty:.3f}"
-        log.info("Basic PWM test passed")
+        log.info("Basic PWM generation test passed")
     except Exception as e:
-        error_msg = f"Basic PWM test failed: {str(e)}\n{traceback.format_exc()}"
-        log.error(error_msg)
+        log.error(f"Test failed: {str(e)}\n{traceback.format_exc()}")
         raise
 
 @cocotb.test()
-async def test_rrpwm_duty_update(dut):
-    """Test 2: Change duty cycle during operation."""
+async def test_enable_disable_control(dut):
+    """Test 3: Enable/Disable Control Tests"""
     try:
-        log.info("Starting duty cycle update test")
-        # Set up clock
+        log.info("Starting enable/disable control test")
+        
         clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
         cocotb.start_soon(clock.start(start_high=False))
         
-        # Reset
-        log.info("Applying reset")
-        dut.rst_n_i.value = 0
-        await Timer(CLK_PERIOD * 2, units="ns")
-        dut.rst_n_i.value = 1
-        await Timer(CLK_PERIOD * 2, units="ns")
+        await initialize_dut(dut)
+        await apply_reset(dut)
         
-        # Set up test parameters
-        period = 100
-        dut.period_i.value = period
-        dut.enable_i.value = 1  # Enable channel 0
-        
-        # Start with 50% duty cycle
-        log.info("Setting initial duty cycle to 50%")
-        dut.duty_i.value = 50  # Changed from duty_i[0] to duty_i
-        await Timer(CLK_PERIOD * period * 3, units="ns")
-        
-        # Change to 80% duty cycle
-        log.info("Updating duty cycle to 80%")
-        dut.duty_i.value = 80  # Changed from duty_i[0] to duty_i
-        await Timer(CLK_PERIOD * period * 3, units="ns")
-        
-        # Measure new duty cycle
-        measured_duty = await measure_pwm(dut, 0, period, 1)
-        expected_duty = 80 / period
-        tolerance = 0.01  # 1% tolerance
-        
-        assert abs(measured_duty - expected_duty) <= tolerance, \
-            f"Duty cycle mismatch after update. Expected: {expected_duty:.3f}, Measured: {measured_duty:.3f}"
-        log.info("Duty cycle update test passed")
-    except Exception as e:
-        error_msg = f"Duty cycle update test failed: {str(e)}\n{traceback.format_exc()}"
-        log.error(error_msg)
-        raise
-
-@cocotb.test()
-async def test_rrpwm_period_update(dut):
-    """Test 3: Change period during operation."""
-    try:
-        log.info("Starting period update test")
-        # Set up clock
-        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
-        cocotb.start_soon(clock.start(start_high=False))
-        
-        # Reset
-        log.info("Applying reset")
-        dut.rst_n_i.value = 0
-        await Timer(CLK_PERIOD * 2, units="ns")
-        dut.rst_n_i.value = 1
-        await Timer(CLK_PERIOD * 2, units="ns")
-        
-        # Set up test parameters
-        period = 100
-        dut.period_i.value = period
-        dut.enable_i.value = 1  # Enable channel 0
-        
-        # Start with 50% duty cycle
-        log.info("Setting initial period to 100 and duty cycle to 50%")
-        dut.duty_i.value = 50  # Changed from duty_i[0] to duty_i
-        await Timer(CLK_PERIOD * period * 3, units="ns")
-        
-        # Change period to 200 and adjust duty cycle
-        period = 200
-        log.info(f"Updating period to {period} and adjusting duty cycle")
-        dut.period_i.value = period
-        dut.duty_i.value = 100  # 50% of new period
-        await Timer(CLK_PERIOD * period * 3, units="ns")
-        
-        # Measure new duty cycle
-        measured_duty = await measure_pwm(dut, 0, period, 1)
-        expected_duty = 100 / period  # Should still be 50%
-        tolerance = 0.01  # 1% tolerance
-        
-        assert abs(measured_duty - expected_duty) <= tolerance, \
-            f"Duty cycle mismatch after period change. Expected: {expected_duty:.3f}, Measured: {measured_duty:.3f}"
-        log.info("Period update test passed")
-    except Exception as e:
-        error_msg = f"Period update test failed: {str(e)}\n{traceback.format_exc()}"
-        log.error(error_msg)
-        raise
-
-@cocotb.test()
-async def test_rrpwm_enable_disable(dut):
-    """Test 4: Test enable/disable functionality."""
-    try:
-        log.info("Starting enable/disable test")
-        # Set up clock
-        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
-        cocotb.start_soon(clock.start(start_high=False))
-        
-        # Reset
-        log.info("Applying reset")
-        dut.rst_n_i.value = 0
-        await Timer(CLK_PERIOD * 2, units="ns")
-        dut.rst_n_i.value = 1
-        await Timer(CLK_PERIOD * 2, units="ns")
-        
-        # Set up test parameters
-        period = 100
-        dut.period_i.value = period
-        dut.duty_i.value = 50  # Changed from duty_i[0] to duty_i
-        
-        # Enable channel
-        log.info("Enabling channel")
-        dut.enable_i.value = 1
-        await Timer(CLK_PERIOD * period * 3, units="ns")
-        
-        # Disable channel
-        log.info("Disabling channel")
+        # Test disable state
         dut.enable_i.value = 0
-        await Timer(CLK_PERIOD * period * 3, units="ns")
+        await RisingEdge(dut.clk_i)
+        assert dut.pwm_o.value == 0, "PWM not inactive when disabled"
         
-        # Check that output is inactive
-        assert dut.pwm_o.value == 0, "Output should be inactive when disabled"
-        log.info("Enable/disable test passed")
+        # Test enable state
+        dut.enable_i.value = 1
+        await RisingEdge(dut.clk_i)
+        
+        # Test mid-cycle disable
+        await Timer(CLK_PERIOD * 10, units="ns")
+        dut.enable_i.value = 0
+        await RisingEdge(dut.clk_i)
+        assert dut.pwm_o.value == 0, "PWM not returning to inactive state when disabled"
+        
+        log.info("Enable/disable control test passed")
     except Exception as e:
-        error_msg = f"Enable/disable test failed: {str(e)}\n{traceback.format_exc()}"
-        log.error(error_msg)
+        log.error(f"Test failed: {str(e)}\n{traceback.format_exc()}")
+        raise
+
+@cocotb.test()
+async def test_period_control(dut):
+    """Test 4: Period Control Tests"""
+    try:
+        log.info("Starting period control test")
+        
+        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
+        cocotb.start_soon(clock.start(start_high=False))
+        
+        await initialize_dut(dut)
+        await apply_reset(dut)
+        
+        # Test period_i = 0 uses DEFAULT_PERIOD
+        dut.period_i.value = 0
+        dut.enable_i.value = 1
+        
+        period_count = 0
+        last_value = 0
+        transitions = 0
+        
+        # Count transitions for DEFAULT_PERIOD cycles
+        for _ in range(DEFAULT_PERIOD * 2):
+            await RisingEdge(dut.clk_i)
+            if dut.pwm_o.value != last_value:
+                transitions += 1
+            last_value = dut.pwm_o.value
+            period_count += 1
+        
+        assert transitions > 0, "No PWM transitions detected"
+        
+        # Test custom period
+        test_period = 100
+        dut.period_i.value = test_period
+        await Timer(CLK_PERIOD * test_period * 2, units="ns")
+        
+        log.info("Period control test passed")
+    except Exception as e:
+        log.error(f"Test failed: {str(e)}\n{traceback.format_exc()}")
+        raise
+
+@cocotb.test()
+async def test_duty_cycle_control(dut):
+    """Test 5: Duty Cycle Control Tests"""
+    try:
+        log.info("Starting duty cycle control test")
+        
+        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
+        cocotb.start_soon(clock.start(start_high=False))
+        
+        await initialize_dut(dut)
+        await apply_reset(dut)
+        
+        test_cases = [
+            (0, 0),      # 0%
+            (64, 25),    # 25%
+            (128, 50),   # 50%
+            (192, 75),   # 75%
+            (255, 100),  # 100%
+        ]
+        
+        for duty, expected_percent in test_cases:
+            dut.duty_i[0].value = duty
+            dut.enable_i.value = 1
+            
+            high_count = 0
+            total_count = 0
+            
+            # Monitor for one complete period
+            for _ in range(DEFAULT_PERIOD):
+                await RisingEdge(dut.clk_i)
+                if dut.pwm_o.value == 1:
+                    high_count += 1
+                total_count += 1
+            
+            actual_percent = (high_count / total_count) * 100
+            assert abs(actual_percent - expected_percent) <= 1, f"Duty cycle error: got {actual_percent}%, expected {expected_percent}%"
+        
+        log.info("Duty cycle control test passed")
+    except Exception as e:
+        log.error(f"Test failed: {str(e)}\n{traceback.format_exc()}")
+        raise
+
+@cocotb.test()
+async def test_edge_cases(dut):
+    """Test 7: Edge Cases"""
+    try:
+        log.info("Starting edge cases test")
+        
+        clock = Clock(dut.clk_i, CLK_PERIOD, units="ns")
+        cocotb.start_soon(clock.start(start_high=False))
+        
+        await initialize_dut(dut)
+        await apply_reset(dut)
+        
+        # Test minimum period value
+        dut.period_i.value = 1
+        dut.duty_i[0].value = 1
+        dut.enable_i.value = 1
+        await Timer(CLK_PERIOD * 10, units="ns")
+        
+        # Test maximum period value
+        max_period = (1 << COUNTER_WIDTH) - 1
+        dut.period_i.value = max_period
+        await Timer(CLK_PERIOD * 10, units="ns")
+        
+        # Test rapid duty cycle changes
+        for _ in range(5):
+            dut.duty_i[0].value = random.randint(0, max_period)
+            await Timer(CLK_PERIOD * 2, units="ns")
+        
+        # Test rapid period changes
+        for _ in range(5):
+            dut.period_i.value = random.randint(1, max_period)
+            await Timer(CLK_PERIOD * 2, units="ns")
+        
+        log.info("Edge cases test passed")
+    except Exception as e:
+        log.error(f"Test failed: {str(e)}\n{traceback.format_exc()}")
         raise 

@@ -1,0 +1,62 @@
+RRPWM Basic Functionality Test Plan
+=====================================
+
+Module Under Test: rrpwm.sv
+Test Focus: Basic functionality verification
+
+1. Reset Behavior Tests
+   - Check output is correct polarity on reset (both POLARITY=1 and POLARITY=0)
+   - Verify counter resets to 0
+   - Verify all channels respect polarity on reset
+
+2. Basic PWM Generation Tests
+   - Single channel operation with default parameters
+     * Verify 50% duty cycle (DEFAULT_DUTY=128, DEFAULT_PERIOD=255)
+     * Measure output frequency matches expected period
+     * Confirm output polarity matches POLARITY parameter
+
+3. Enable/Disable Control Tests
+   - Verify channel outputs inactive state when disabled
+   - Test enabling/disabling individual channels in multi-channel config
+   - Check output returns to inactive state when disabled mid-cycle
+
+4. Period Control Tests
+   - Test period_i = 0 uses DEFAULT_PERIOD
+   - Test various period values within COUNTER_WIDTH range
+   - Verify counter properly wraps at period value
+
+5. Duty Cycle Control Tests
+   - Test duty_i = 0 uses DEFAULT_DUTY
+   - Test duty cycle greater than period uses bounded value
+   - Verify multiple duty cycle values:
+     * 0% (always off)
+     * 25% duty cycle
+     * 50% duty cycle
+     * 75% duty cycle
+     * 100% (always on)
+
+6. Multi-Channel Tests
+   - Verify independent operation of multiple channels
+   - Test different duty cycles on different channels
+   - Check for channel crosstalk
+
+7. Edge Cases
+   - Test minimum period value
+   - Test maximum period value (2^COUNTER_WIDTH - 1)
+   - Test rapid changes in duty cycle
+   - Test rapid changes in period
+
+Test Environment Requirements:
+- Clock frequency: TBD based on application
+- Minimum test duration: Multiple complete PWM cycles per test case
+- Required measurements:
+  * Clock cycles between PWM edges
+  * Duty cycle timing accuracy
+  * Period timing accuracy
+
+Expected Results:
+- PWM output should match expected frequency and duty cycle
+- All channels should operate independently
+- Polarity should be respected in all operating modes
+- Enable/disable control should work immediately
+- Period and duty cycle changes should take effect at next cycle boundary 

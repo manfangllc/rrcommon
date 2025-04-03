@@ -1,0 +1,102 @@
+RR SPI Slave Module Test Plan
+============================
+
+Module Parameters to Test:
+------------------------
+- CMD_WIDTH = 16 (default)
+- DATA_WIDTH = 8 (default)
+
+Basic Interface Signals:
+----------------------
+System Signals:
+- clk   (input)  - System clock
+- rst_n (input)  - Active low reset
+
+SPI Interface:
+- sclk  (input)  - SPI clock from master
+- mosi  (input)  - Master Out Slave In
+- cs_n  (input)  - Chip Select (active low)
+- miso  (output) - Master In Slave Out (tri-state)
+
+Control/Data Signals:
+- cmd_received   (output) - Command received indicator
+- cmd           (output) - Received command [CMD_WIDTH-1:0]
+- rx_data       (output) - Received data [DATA_WIDTH-1:0]
+- tx_data       (input)  - Data to transmit [DATA_WIDTH-1:0]
+- transfer_done (output) - Transfer complete indicator
+
+Test Scenarios:
+--------------
+
+1. Reset Behavior Test
+   - Apply reset (rst_n = 0)
+   - Verify all outputs are in default state:
+     * miso = High-Z
+     * cmd_received = 0
+     * cmd = 0
+     * rx_data = 0
+     * transfer_done = 0
+
+2. Idle State Test
+   - With cs_n high, verify:
+     * miso remains in High-Z state
+     * No state transitions occur
+     * Apply various sclk, mosi inputs to verify no impact
+
+3. Basic Command Reception
+   - Send 16-bit command pattern (e.g., 0xA55A)
+   - Verify cmd_received pulses
+   - Verify cmd register contains correct value
+   - Check timing relative to sclk rising edges
+
+4. Basic Data Transfer
+   - Setup tx_data with known pattern (e.g., 0x55)
+   - Send command followed by data phase
+   - Verify received data on rx_data
+   - Verify miso outputs tx_data bits in correct order
+   - Check transfer_done assertion
+
+5. CS_N Behavior Tests
+   - Test early cs_n deassert during command
+   - Test early cs_n deassert during data
+   - Verify proper state reset on cs_n rising edge
+   - Verify miso returns to High-Z when cs_n high
+
+6. Clock Edge Tests
+   - Verify MOSI sampling on sclk rising edge
+   - Verify MISO updates on sclk falling edge
+   - Test various sclk frequencies within spec
+
+7. Back-to-Back Transfer Test
+   - Perform multiple command/data transfers
+   - Verify no data corruption between transfers
+   - Check minimum cs_n high time between transfers
+
+8. Invalid Scenarios
+   - Test partial command reception
+   - Test partial data reception
+   - Verify proper recovery after incomplete transfers
+
+Timing Parameters to Verify:
+--------------------------
+1. Setup time for MOSI relative to SCLK rising edge
+2. Hold time for MOSI relative to SCLK rising edge
+3. MISO output delay from SCLK falling edge
+4. Minimum CS_N high time between transfers
+5. Minimum SCLK period
+
+Test Environment Requirements:
+---------------------------
+1. Cocotb testbench with:
+   - Clock generator for system clock
+   - SPI master model to drive:
+     * SCLK
+     * MOSI
+     * CS_N
+   - Monitor for all outputs
+   - Scoreboard for data verification
+   - Coverage collection for:
+     * State transitions
+     * Command values
+     * Data values
+     * CS_N timing scenarios 

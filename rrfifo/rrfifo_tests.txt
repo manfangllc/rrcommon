@@ -1,0 +1,60 @@
+RRFIFO Test Plan
+=============
+
+1. Reset Behavior Tests
+   - Test 1.1: Verify reset initializes all outputs to default values
+   - Test 1.2: Verify reset clears the FIFO count to zero
+   - Test 1.3: Verify reset deasserts all status flags (full, almost_full, overflow, empty, almost_empty, underflow)
+
+2. Basic Operation Tests
+   - Test 2.1: Write single data word and verify it can be read back
+   - Test 2.2: Write multiple data words and verify FIFO ordering (first-in-first-out)
+   - Test 2.3: Alternate write and read operations
+   - Test 2.4: Simultaneous read and write operations
+   - Test 2.5: Verify data integrity across all bit positions
+
+3. Status Flag Tests
+   - Test 3.1: Verify empty flag when FIFO is empty
+   - Test 3.2: Verify full flag when FIFO reaches FIFO_DEPTH
+   - Test 3.3: Verify almost_empty flag triggers at ALMOST_EMPTY threshold
+   - Test 3.4: Verify almost_full flag triggers at ALMOST_FULL threshold
+   - Test 3.5: Verify level_o counter accuracy during operations
+
+4. Error Condition Tests
+   - Test 4.1: Attempt read from empty FIFO and verify underflow flag
+   - Test 4.2: Attempt write to full FIFO and verify overflow flag
+   - Test 4.3: Verify data preservation during overflow attempt
+   - Test 4.4: Verify FIFO state preservation during underflow attempt
+
+5. Pointer Wraparound Tests
+   - Test 5.1: Fill FIFO to verify write pointer wraparound
+   - Test 5.2: Empty FIFO to verify read pointer wraparound
+   - Test 5.3: Continuous write/read operations across multiple wraparounds
+
+6. Threshold Tests
+   - Test 6.1: Verify almost_full assertion/deassertion at threshold boundary
+   - Test 6.2: Verify almost_empty assertion/deassertion at threshold boundary
+   - Test 6.3: Test threshold behavior with rapid read/write transitions
+
+7. Performance Tests
+   - Test 7.1: Burst writes up to full condition
+   - Test 7.2: Burst reads down to empty condition
+   - Test 7.3: Maximum throughput test with continuous read/write operations
+
+8. Corner Case Tests
+   - Test 8.1: Single location available/required scenarios
+   - Test 8.2: Rapid toggling of read/write enables
+   - Test 8.3: Write-read-write patterns at threshold boundaries
+   - Test 8.4: Clock edge alignment for simultaneous operations
+
+9. Parameter Variation Tests
+   - Test 9.1: Verify operation with minimum FIFO depth
+   - Test 9.2: Verify operation with maximum FIFO depth
+   - Test 9.3: Test with various DATA_WIDTH configurations
+   - Test 9.4: Verify with different ALMOST_FULL/ALMOST_EMPTY thresholds
+
+10. Reset Recovery Tests
+    - Test 10.1: Reset during active write operation
+    - Test 10.2: Reset during active read operation
+    - Test 10.3: Reset with partial FIFO contents
+    - Test 10.4: Verify normal operation resumption after reset 
