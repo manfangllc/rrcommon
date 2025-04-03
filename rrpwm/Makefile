@@ -13,4 +13,7 @@ TOPLEVEL = rrpwm
 # Test module
 MODULE = test_rrpwm
 
+# Simulator output file
+SIM_ARGS += > sim.log 2>&1
+
 include $(shell cocotb-config --makefiles)/Makefile.sim 
