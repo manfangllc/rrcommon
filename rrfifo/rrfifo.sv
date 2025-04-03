@@ -43,23 +43,19 @@ module rrfifo #(
   logic [ADDR_WIDTH-1:0]    wr_ptr;
   logic [ADDR_WIDTH-1:0]    rd_ptr;
   logic [ADDR_WIDTH:0]      count;
-  logic                     overflow;
-  logic                     underflow;
   logic                     wr_valid;
   logic                     rd_valid;
-
-  // Write validation
-  assign wr_valid = wr_en_i & ~full_o;
   
-  // Read validation
-  assign rd_valid = rd_en_i & ~empty_o;
-  
-  // Status signals
-  assign full_o         = (count == FIFO_DEPTH);
-  assign empty_o        = (count == 0);
-  assign almost_full_o  = (count >= ALMOST_FULL);
+  // Status flags
+  assign empty_o = (count == 0);
+  assign full_o = (count == FIFO_DEPTH);
   assign almost_empty_o = (count <= ALMOST_EMPTY);
-  assign level_o        = count;
+  assign almost_full_o = (count >= ALMOST_FULL);
+  assign level_o = count;
+  
+  // Operation validation
+  assign wr_valid = wr_en_i && !full_o;
+  assign rd_valid = rd_en_i && !empty_o;
   
   // Memory write process
   always_ff @(posedge clk) begin
@@ -71,46 +67,44 @@ module rrfifo #(
   // Read data output
   assign rd_data_o = mem[rd_ptr];
 
-  // FIFO pointers update logic
+  // FIFO control logic
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      wr_ptr    <= '0;
-      rd_ptr    <= '0;
-      count     <= '0;
-      overflow_o  <= 1'b0;
+      wr_ptr <= '0;
+      rd_ptr <= '0;
+      count <= '0;
+      overflow_o <= 1'b0;
       underflow_o <= 1'b0;
     end else begin
-      // Default values for overflow/underflow
-      overflow_o  <= 1'b0;
+      // Default values for error flags
+      overflow_o <= 1'b0;
       underflow_o <= 1'b0;
       
-      // Handle write pointer
-      if (wr_valid) begin
-        wr_ptr <= (wr_ptr == FIFO_DEPTH - 1) ? '0 : wr_ptr + 1'b1;
+      // Handle write operation
+      if (wr_en_i) begin
+        if (!full_o) begin
+          wr_ptr <= (wr_ptr == FIFO_DEPTH - 1) ? '0 : wr_ptr + 1'b1;
+        end else begin
+          overflow_o <= 1'b1;
+        end
       end
       
-      // Handle read pointer
-      if (rd_valid) begin
-        rd_ptr <= (rd_ptr == FIFO_DEPTH - 1) ? '0 : rd_ptr + 1'b1;
+      // Handle read operation
+      if (rd_en_i) begin
+        if (!empty_o) begin
+          rd_ptr <= (rd_ptr == FIFO_DEPTH - 1) ? '0 : rd_ptr + 1'b1;
+        end else begin
+          underflow_o <= 1'b1;
+        end
       end
       
-      // Update count based on simultaneous operations
+      // Update count based on operations
       case ({wr_valid, rd_valid})
-        2'b01: count <= count - 1'b1; // Read only
         2'b10: count <= count + 1'b1; // Write only
-        2'b11: count <= count;        // Read and write simultaneously
+        2'b01: count <= count - 1'b1; // Read only
+        2'b11: count <= count;        // Both read and write
         default: count <= count;      // No operation
       endcase
-      
-      // Detect overflow
-      if (wr_en_i && full_o) begin
-        overflow_o <= 1'b1;
-      end
-      
-      // Detect underflow
-      if (rd_en_i && empty_o) begin
-        underflow_o <= 1'b1;
-      end
     end
   end
 

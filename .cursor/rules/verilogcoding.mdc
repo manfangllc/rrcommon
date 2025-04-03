@@ -1,0 +1,96 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## 🧠 SystemVerilog Coding Ruleset (Synthesizable RTL Focus)
+
+### 🔧 General Structure
+- **One module per file**, named after the module: `my_module.sv`
+- **Use `package` files** for shared types, constants, and parameters.
+- **Parameterize modules** for reusability (e.g., widths, depths).
+- Top-down instantiation: the top module instantiates all submodules explicitly.
+
+### 🄤 Naming Conventions
+| Item              | Convention                    | Example                |
+|-------------------|-------------------------------|------------------------|
+| Signals (input)   | `snake_case_i`                | `data_valid_i`         |
+| Signals (output)  | `snake_case_o`                | `result_ready_o`       |
+| Internal signals  | `snake_case`                  | `state_reg`, `counter` |
+| Parameters        | `ALL_CAPS`                    | `DATA_WIDTH`           |
+| FSM states        | `PascalCase` enum labels      | `Idle`, `Busy`, `Done` |
+| Clock / reset     | `clk`, `rst_n` (active-low)   |                        |
+
+### 🦀 Always Blocks
+
+#### 🕒 Sequential Logic
+```systemverilog
+always_ff @(posedge clk or negedge rst_n) begin
+  if (!rst_n)
+    state_reg <= Idle;
+  else
+    state_reg <= next_state;
+end
+```
+- Use `always_ff` for registers.
+- Resets should be **synchronous** unless async is explicitly needed.
+- Reset signals should be **active-low** by default (`rst_n`).
+
+#### ⚙️ Combinational Logic
+```systemverilog
+always_comb begin
+  next_state = Idle;
+  case (state_reg)
+    Idle: if (start_i) next_state = Busy;
+    Busy: if (done_i)  next_state = Done;
+    Done:              next_state = Idle;
+  endcase
+end
+```
+- Always use `always_comb` for combinational logic — avoids sensitivity list issues.
+- Initialize outputs in every `always_comb` block to avoid latches.
+- Avoid `always @(*)` unless legacy compatibility is required.
+
+### 🎛 Finite State Machines (FSM)
+- Prefer **enumerated types** for state encoding:
+```systemverilog
+typedef enum logic [1:0] {
+  Idle,
+  Busy,
+  Done
+} fsm_state_t;
+```
+- Use two always blocks:
+  1. One for state register (`always_ff`)
+  2. One for next-state logic and outputs (`always_comb`)
+
+### 📦 Module Interfaces
+- Use **explicit ports** rather than wildcard (`.*`) connections.
+- Group ports logically: `clk`, `rst_n`, control, data in, data out.
+- For complex designs, consider **SystemVerilog `interface`** constructs, but use with care — tools can be inconsistent with synthesis.
+
+### 🧪 Testbenches (Not for Synthesis)
+- Use `logic` types over `reg` and `wire` in SystemVerilog.
+- Avoid delays (`#5`) in RTL. Use them only in **testbenches**.
+- Use `assert`, `cover`, and `assume` where applicable.
+- Simulate **edge cases** and typical operation in testbenches.
+
+### ❌ Don'ts & Pitfalls
+- ❌ Don't mix blocking (`=`) and non-blocking (`<=`) in the same always block.
+- ❌ Don't infer latches (e.g., incomplete if/case).
+- ❌ Don't use `initial` blocks in RTL — only for sim/testbenches.
+- ❌ Avoid asynchronous resets unless necessary (e.g., FPGA primitive constraints).
+- ❌ Don't rely on `for` loops to unroll — check synthesis support.
+- ❌ Avoid `#delay` constructs in synthesis code.
+- ❌ **Avoid multi-driven nets**: Ensure all signals are driven by only one source unless an intentional tri-state or mux structure is used.
+  - Declare nets with `logic` or `wire` types appropriately.
+  - Avoid multiple drivers by isolating control via FSM or arbitration logic.
+  - Use hierarchical design principles to contain drive logic.
+  - If conditional assignment is needed, use mux-style `assign` or combinational `always_comb` blocks clearly separating logic paths.
+
+### ✅ Do's & Good Practices
+- ✅ Keep logic levels shallow — **pipeline early, pipeline often**.
+- ✅ Write self-documenting code and comment intent, not mechanics.
+- ✅ Use `typedef` to make your code easier to change later.
+- ✅ Synthesize frequently; don't wait to test for timing/size surprises.
+- ✅ Structure RTL cleanly: one process per behavior or clocked domain. 

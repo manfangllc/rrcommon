@@ -1,0 +1,12 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+When prompted to generate a new module, do the following:
+
+Based on the module name, create a:
+
+new directory in the root named [modulename]
+
+Go into that directory, and generate a [modulename.sv] file with the code, a [modulename_tb.sv] file with the testbench, and a README.md with a descriptin of the module, including the following (and only the following) sections: ports, parameters, an instantiation snippet, module usage description, and an example with timing diagrams. Do not include any other topics.

@@ -2,6 +2,41 @@
 // Safe synchronization between different clock domains
 // Author: Claude AI
 
+// Multi-stage synchronizer submodule
+module sync_chain #(
+  parameter WIDTH = 1,           // Data width
+  parameter STAGES = 2,          // Number of synchronizer stages
+  parameter RESET_VALUE = '0     // Value to set on reset
+)(
+  input  logic              clk_i,    // Destination clock
+  input  logic              rst_n_i,  // Destination reset (active low)
+  input  logic [WIDTH-1:0]  data_i,   // Asynchronous input data
+  output logic [WIDTH-1:0]  data_o    // Synchronized output data
+);
+  // Synchronizer flip-flop chain
+  logic [WIDTH-1:0] sync_stages [STAGES-1:0];
+  
+  always_ff @(posedge clk_i or negedge rst_n_i) begin
+    if (!rst_n_i) begin
+      // Reset all stages to defined value
+      for (int i = 0; i < STAGES; i++) begin
+        sync_stages[i] <= RESET_VALUE;
+      end
+    end else begin
+      // First stage samples the async input
+      sync_stages[0] <= data_i;
+      
+      // Subsequent stages form the synchronization chain
+      for (int i = 1; i < STAGES; i++) begin
+        sync_stages[i] <= sync_stages[i-1];
+      end
+    end
+  end
+  
+  // Output is the last stage
+  assign data_o = sync_stages[STAGES-1];
+endmodule
+
 module rr_cdc #(
   parameter WIDTH = 1,          // Width of data bus
   parameter SYNC_STAGES = 2,    // Number of synchronizer stages (2 or 3 recommended)
@@ -230,44 +265,5 @@ module rr_cdc #(
       );
     end
   endgenerate
-  
-  // --------------------------------------------------
-  // Multi-stage synchronizer submodule
-  // --------------------------------------------------
-  
-  // Internal multi-stage synchronizer
-  module sync_chain #(
-    parameter WIDTH = 1,           // Data width
-    parameter STAGES = 2,          // Number of synchronizer stages
-    parameter RESET_VALUE = '0     // Value to set on reset
-  )(
-    input  logic              clk_i,    // Destination clock
-    input  logic              rst_n_i,  // Destination reset (active low)
-    input  logic [WIDTH-1:0]  data_i,   // Asynchronous input data
-    output logic [WIDTH-1:0]  data_o    // Synchronized output data
-  );
-    // Synchronizer flip-flop chain
-    logic [WIDTH-1:0] sync_stages [STAGES-1:0];
-    
-    always_ff @(posedge clk_i or negedge rst_n_i) begin
-      if (!rst_n_i) begin
-        // Reset all stages to defined value
-        for (int i = 0; i < STAGES; i++) begin
-          sync_stages[i] <= RESET_VALUE;
-        end
-      end else begin
-        // First stage samples the async input
-        sync_stages[0] <= data_i;
-        
-        // Subsequent stages form the synchronization chain
-        for (int i = 1; i < STAGES; i++) begin
-          sync_stages[i] <= sync_stages[i-1];
-        end
-      end
-    end
-    
-    // Output is the last stage
-    assign data_o = sync_stages[STAGES-1];
-  endmodule
-  
+
 endmodule 

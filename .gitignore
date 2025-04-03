@@ -1,0 +1,11 @@
+# Ignore all sim_build directories
+**/sim_build/
+
+# Ignore all results.xml files
+**/results.xml
+
+# Ignore all sim.log files
+**/sim.log
+
+# Ignore all Python cache directories
+**/__pycache__/ 
