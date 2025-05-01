@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 When prompted to generate a new module, do the following:
 
@@ -9,7 +9,7 @@ Determine if it's reasonable to make the module based on the parameters passed i
 
 Determine if the cocotb docs are in the context.
 
-If it cannot be created with a reasonable degree of accuracy, or if the cocotb docs are not in context, inform the user of the issue (ie, not enough details, cocotb docs are not in context, and they should add them), and do not follow the rest of the instructions. Abort the request.
+If it cannot be created with a reasonable degree of accuracy, or if the cocotb docs are not in context, inform the user of the issue (ie, not enough details, cocotb docs are not in context, and they should add them), and do not follow the rest of the instructions. Abort the request and prompt user with why.
 
 If the module can be created, then based on the module name,
 
@@ -17,12 +17,10 @@ If the module can be created, then based on the module name,
 
 2. Go into that directory 
 
-3. generate a [modulename.sv] file with the code, based on the input description and following the rules in newmodule.mdc.
+3. Generate a [modulename.sv] file with the code, based on the input description and following the rules in codingstandards.mdc.
 
-4. Examine the module for functionality, and create a [modulename]_tests.txt document with a series of tests to confirm critical functionality of the module and test reasonable edge cases. Consider what tests are important for functionality, and do not overtest or duplicate tests.
+4. Based on the critical functionality of the module, create a [modulename]_tests.txt document with a series of tests to confirm critical functionality only. Our goal is to end up with a waveform file for the user to debug, not to do a full debug. Consider what tests are important for functionality, and do not overtest or duplicate tests.
 
-5. Using the [modulename]_tests.txt file, Generate a cocotb test_[modulename.py] file with the testbench following these patterns:
-
-6. Create but leave empty a file named test_[modulename].py to later build into a testbench.
+5. Using the [modulename]_tests.txt file, as a reference for what tests to create, Generate a cocotb test_[modulename.py] file with the testbench following the rules in gencocotb.mdc
 
 7. Create a README.md with a description of the module, including the following (and only the following) sections: ports, parameters, an instantiation snippet, module usage description, and an example with timing diagrams. Do not include any other topics.

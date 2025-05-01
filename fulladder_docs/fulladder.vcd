@@ -1,0 +1,53 @@
+$date
+	Thu Apr  3 16:59:38 2025
+
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ps
+$end
+$scope module fulladder $end
+$var wire 1 ! a $end
+$var wire 1 " b $end
+$var wire 1 # cin $end
+$var wire 1 $ cout $end
+$var wire 1 % sum $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0%
+0$
+0#
+0"
+0!
+$end
+#4000
+1#
+1%
+#8000
+0#
+1"
+#12000
+1#
+0%
+1$
+#16000
+0$
+1%
+0#
+0"
+1!
+#20000
+1#
+0%
+1$
+#24000
+0#
+1"
+#28000
+1#
+1%
+#32001

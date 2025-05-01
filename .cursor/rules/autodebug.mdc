@@ -29,16 +29,15 @@ alwaysApply: true
    a) Analyze results
       -analyse errors in testbench
       -examine output files (results.xml, sim.log, and /sim_build/ files)
-      -analyse errors in testbench succesfully completing, and fix errors as needed and iterate.
-      -emphasize finding errors in the testbench first, as we want to debug the testbench properly.
+      -emphasize finding errors in the testbench first, as we want to debug the testbench properly. prompt the user to add the cocotb documentation context if needed.
       -when the testbench appears correct, begin editing the modules .sv rtl file to fix errors.
 
 
 ### 7. Verification Steps
    1. Run clean build
-   2. Check compilation
-   3. Review simulation log
-   4. Analyze waveforms
+   2. Make sure it completes without errors, and fix errors to get clean simulation running.
+   3. Validate waveform file (fst) was generated. Review
+   4. Review simulation log for errors
    5. Fix testbench first if issues found - we need to debug the testbench properly before editing code
    6. When testbench appears to be correct, starting making code changes to try and get tests to pass.
    7. Do NOT break functionality of the code to make the testbench work. If you loop 5 times on the same issue, stop, and request my interaction.
