@@ -38,6 +38,7 @@ Cummings style), reusing the `sync_chain` double-flop synchronizer from
 | SYNC_STAGES  | Pointer synchronizer flop count (2–3 typical)  | 2         |
 | WR_MODE      | Write enable mode: `"LEVEL"` or `"PULSE"`      | `"LEVEL"` |
 | RD_MODE      | Read enable mode: `"LEVEL"` or `"PULSE"`       | `"LEVEL"` |
+| RAM_STYLE    | `mem` inference hint (see below)               | `"auto"`  |
 
 `FIFO_DEPTH` is checked at elaboration; a non-power-of-2 or `< 2` value raises a
 SystemVerilog `$error`. The power-of-2 requirement comes from the Gray-pointer
@@ -129,3 +130,63 @@ make clean_all && make sim WR_MODE=PULSE RD_MODE=PULSE
 
 All four configurations pass 10/10. View waveforms with
 `gtkwave sim_build/rrfifo_async.fst`.
+
+## Synthesis & CDC closure
+
+This module is **RTL-only — it instantiates no vendor primitives** (no `XPM_*`,
+no `unisim` cells, no `RAMB`/`FIFO36E2`). The SystemVerilog source is the single
+source of truth and simulates unchanged in Verilator. Mapping it cleanly and
+*safely* onto a Xilinx FPGA needs three things, none of which break that:
+
+1. **Synchronizer placement.** The `sync_chain` flops in
+   [`rr_cdc.sv`](../rr_cdc/rr_cdc.sv) carry `(* ASYNC_REG = "TRUE" *)` so Vivado
+   keeps each 2-flop chain placed tightly and out of SRL/RAM/DSP, preserving the
+   metastability settling window (MTBF). This is a synthesis *attribute*, not a
+   primitive — other tools ignore it.
+
+2. **Memory inference.** `mem` is a textbook simple-dual-port array (one write
+   clock, one registered read clock) and infers SDP RAM automatically. The
+   `RAM_STYLE` parameter drives a `(* ram_style = ... *)` hint: `"auto"`
+   (default) lets Vivado pick block vs distributed by depth; pin `"block"` /
+   `"distributed"` / `"ultra"` per instance when you want the resource target
+   deterministic. Again an attribute, not a primitive.
+
+3. **Timing constraints.** [`rrfifo_async.xdc`](./rrfifo_async.xdc) is a
+   **scoped** constraint file — apply it per instance:
+   ```tcl
+   read_xdc -ref rrfifo_async -unmanaged rrfifo_async.xdc
+   ```
+   It bounds the two Gray-pointer synchronizer crossings with
+   `set_max_delay -datapath_only` (gives a metastable bit the full destination
+   period to settle) plus `set_bus_skew` (Gray code changes exactly one bit per
+   step — bounding inter-bit skew preserves that guarantee through routing). It
+   deliberately avoids a blanket `set_clock_groups -asynchronous`, which would
+   *outrank* and silently disable those bounds; see the header comment for the
+   rationale and the blanket-approach alternative.
+
+### `report_cdc` waiver — RAM data path
+
+A CDC report (`report_cdc` / a lint pass) will flag the `mem` data path as an
+unsynchronized crossing: it is written in the `wr_clk_i` domain and read in the
+`rd_clk_i` domain with no synchronizer on the data bus. **This is safe by
+construction and should be waived**, with this rationale:
+
+> The read address is derived from a Gray pointer that is itself synchronized
+> through the double-flop `sync_chain`. A read address therefore cannot point at
+> a memory word until that word has been committed *and* the write pointer has
+> propagated across the synchronizer — many cycles after the data was written
+> and is stable. The data bus needs no synchronizer because the pointer
+> handshake guarantees the data is static before any read can reach it. This is
+> the standard Cummings-style async-FIFO RAM crossing.
+
+The scoped XDC bounds this path with `set_max_delay -datapath_only` rather than
+leaving it unconstrained (a `set_false_path` is an acceptable looser
+alternative).
+
+### Not yet done (deferred)
+
+An out-of-context Vivado **synth + STA pass** to *prove* the above — zero
+unwanted primitives, RAM inferred as intended, `ASYNC_REG` honored, constraints
+applied, timing clean, and the RAM-path cell selector in the XDC confirmed
+against this build's inference. The RTL, attributes, and constraint template are
+in place; the synth/STA verification is the remaining step before silicon.

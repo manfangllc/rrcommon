@@ -34,7 +34,9 @@ module rrfifo_async #(
   parameter int    ALMOST_EMPTY = 4,
   parameter int    SYNC_STAGES  = 2,     // pointer synchronizer flop count
   parameter        WR_MODE      = "LEVEL", // "LEVEL" or "PULSE"
-  parameter        RD_MODE      = "LEVEL"  // "LEVEL" or "PULSE"
+  parameter        RD_MODE      = "LEVEL", // "LEVEL" or "PULSE"
+  parameter        RAM_STYLE    = "auto"   // mem inference hint: "auto"/"block"/
+                                           // "distributed"/"ultra"/"registers"
 ) (
   // Write domain
   input  logic                        wr_clk_i,
@@ -78,7 +80,9 @@ module rrfifo_async #(
   // ------------------------------------------------------------------
   // Storage (simple dual-port: 1 write port, 1 read port; no reset)
   // ------------------------------------------------------------------
-  logic [DATA_WIDTH-1:0] mem [FIFO_DEPTH-1:0];
+  // ram_style is a parameterized synthesis hint (not a primitive): "auto" lets
+  // Vivado pick block vs distributed by depth; pin it per-instance if needed.
+  (* ram_style = RAM_STYLE *) logic [DATA_WIDTH-1:0] mem [FIFO_DEPTH-1:0];
 
   // ------------------------------------------------------------------
   // Pointers (binary + Gray), one set per domain

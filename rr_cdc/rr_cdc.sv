@@ -13,8 +13,13 @@ module sync_chain #(
   input  logic [WIDTH-1:0]  data_i,   // Asynchronous input data
   output logic [WIDTH-1:0]  data_o    // Synchronized output data
 );
-  // Synchronizer flip-flop chain
-  logic [WIDTH-1:0] sync_stages [STAGES-1:0];
+  // Synchronizer flip-flop chain.
+  // ASYNC_REG keeps the chain placed tightly (and out of SRL/RAM/DSP) so the
+  // metastability settling window is maximized. It is a synthesis attribute,
+  // NOT a vendor primitive: Verilator and other tools parse and ignore it, so
+  // the RTL stays a single portable source of truth. Correct for every
+  // consumer of sync_chain (it is always a true synchronizer).
+  (* ASYNC_REG = "TRUE" *) logic [WIDTH-1:0] sync_stages [STAGES-1:0];
   
   always_ff @(posedge clk_i or negedge rst_n_i) begin
     if (!rst_n_i) begin
